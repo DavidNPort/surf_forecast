@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas requests numpy
+          pip install pandas requests numpy jinja2
 
       - name: Run forecast script
         run: |
