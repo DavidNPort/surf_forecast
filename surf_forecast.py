@@ -19,7 +19,6 @@ def compass_to_arrow(dir_str):
     return arrows.get(dir_str, "")
 
 def slugify(name):
-    # remove accents, lowercase, spaces → underscores
     nfkd = unicodedata.normalize("NFKD", name)
     only_ascii = "".join(c for c in nfkd if not unicodedata.combining(c))
     return only_ascii.lower().replace(" ", "_")
@@ -32,8 +31,8 @@ locations = {
 }
 webcams = {
     "Las Palmas": '<iframe src="https://in2thebeach.es/callbacks/camviewer_ext2.php?id=57" scrolling="no"></iframe>',
-    "Telde":     '<iframe src="https://in2thebeach.es/callbacks/camviewer_ext2.php?id=43" scrolling="no"></iframe>',
-    "Arguineguín":'<iframe src="https://in2thebeach.es/callbacks/camviewer_ext2.php?id=71" scrolling="no"></iframe>'
+    "Telde": '<iframe src="https://in2thebeach.es/callbacks/camviewer_ext2.php?id=43" scrolling="no"></iframe>',
+    "Arguineguín": '<iframe src="https://in2thebeach.es/callbacks/camviewer_ext2.php?id=71" scrolling="no"></iframe>'
 }
 
 # ========== Prepare docs folder ==========
@@ -44,7 +43,7 @@ print(">>> Writing files into:", os.path.abspath(docs_dir))
 # ========== Fetch & process data ==========
 dfs = []
 for name, (lat, lon) in locations.items():
-    # 1) Weather
+    # Weather data
     url_w = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
@@ -54,7 +53,7 @@ for name, (lat, lon) in locations.items():
     df_w = pd.DataFrame(requests.get(url_w).json()["hourly"])
     df_w["time"] = pd.to_datetime(df_w["time"])
 
-    # 2) Marine
+    # Marine data
     url_m = (
         f"https://marine-api.open-meteo.com/v1/marine?"
         f"latitude={lat}&longitude={lon}"
@@ -64,61 +63,41 @@ for name, (lat, lon) in locations.items():
     df_m = pd.DataFrame(requests.get(url_m).json()["hourly"])
     df_m["time"] = pd.to_datetime(df_m["time"])
 
-    # 3) Next 24h slice
+    # Filter next 24 hours
     now = datetime.now()
     cutoff = now + pd.Timedelta(hours=24)
     df_w = df_w[(df_w["time"] >= now) & (df_w["time"] < cutoff)]
     df_m = df_m[(df_m["time"] >= now) & (df_m["time"] < cutoff)]
 
-    # 4) Merge & rename
-    df = pd.merge(df_w, df_m, on="time", how="outer") \
-           .rename(columns={
-               "windspeed_10m":"Wind Speed (m/s)",
-               "winddirection_10m":"Wind Direction",
-               "temperature_2m":"Air Temp (°C)",
-               "wave_height":"Wave Height (m)",
-               "wave_direction":"Wave Direction",
-               "wave_period":"Wave Period (s)"
-           }) \
-           .sort_values("time") \
-           .reset_index(drop=True)
+    # Merge & process
+    df = pd.merge(df_w, df_m, on="time", how="outer").rename(columns={
+        "windspeed_10m": "Wind Speed (m/s)",
+        "winddirection_10m": "Wind Direction",
+        "temperature_2m": "Air Temp (°C)",
+        "wave_height": "Wave Height (m)",
+        "wave_direction": "Wave Direction",
+        "wave_period": "Wave Period (s)"
+    }).sort_values("time").reset_index(drop=True)
 
-    # 5) Compass & arrows
-    df["Wind Dir Compass"] = df["Wind Direction"].apply(
-        lambda x: degrees_to_compass(x) if pd.notnull(x) else ""
-    )
-    df["Wave Dir Compass"] = df["Wave Direction"].apply(
-        lambda x: degrees_to_compass(x) if pd.notnull(x) else ""
-    )
+    # Compass & arrows
+    df["Wind Dir Compass"] = df["Wind Direction"].apply(lambda x: degrees_to_compass(x) if pd.notnull(x) else "")
+    df["Wave Dir Compass"] = df["Wave Direction"].apply(lambda x: degrees_to_compass(x) if pd.notnull(x) else "")
     df["Wind Arrow"] = df["Wind Dir Compass"].apply(compass_to_arrow)
     df["Wave Arrow"] = df["Wave Dir Compass"].apply(compass_to_arrow)
 
-    # 6) Energy & power
-    df["Wave Energy (kJ/m²)"] = (
-        125 * (df["Wave Height (m)"]**2) * df["Wave Period (s)"]
-    ).round(0)
-    df["Wave Power Index"] = (
-        df["Wave Height (m)"] * df["Wave Period (s)"]
-    ).round(2)
+    # Wave energy & power
+    df["Wave Energy (kJ/m²)"] = (125 * (df["Wave Height (m)"]**2) * df["Wave Period (s)"]).round(0)
+    df["Wave Power Index"] = (df["Wave Height (m)"] * df["Wave Period (s)"]).round(2)
 
-    # 7) Round numeric
+    # Rounding
     for col in ["Wind Speed (m/s)", "Air Temp (°C)", "Wave Height (m)", "Wave Period (s)"]:
         df[col] = df[col].round(1)
 
     df["Location"] = name
     dfs.append(df)
 
+# Combine all data
 df_all = pd.concat(dfs, ignore_index=True)
-
-# ========== Styling helpers ==========
-def highlight_direction(val):
-    return "color: #33cccc; font-weight: bold" if isinstance(val, str) else ""
-def color_wave(val):
-    c = int(220 - min(200, val * 50))
-    return f"background-color: rgb({c},{c},255);"
-def color_energy(val):
-    c = int(220 - min(200, val / 4))
-    return f"background-color: rgb(255,{c},150);"
 
 # ========== Write one page per location ==========
 for name in locations:
@@ -126,21 +105,13 @@ for name in locations:
     page_file = f"{slug}.html"
     print("Generating:", page_file)
 
-    styled = df_all[df_all["Location"] == name][[
-        "time","Wind Speed (m/s)","Wind Arrow","Air Temp (°C)",
-        "Wave Height (m)","Wave Arrow","Wave Period (s)",
-        "Wave Power Index","Wave Energy (kJ/m²)"
-    ]].style.format({
-        "Wind Speed (m/s)":"{:.1f}",
-        "Air Temp (°C)":"{:.1f}",
-        "Wave Height (m)":"{:.1f}",
-        "Wave Period (s)":"{:.1f}",
-        "Wave Energy (kJ/m²)":"{:.0f}"
-    }).applymap(highlight_direction, subset=["Wind Arrow","Wave Arrow"]) \
-      .applymap(color_wave, subset=["Wave Height (m)"]) \
-      .applymap(color_energy, subset=["Wave Energy (kJ/m²)"])
+    table_df = df_all[df_all["Location"] == name][[
+        "time", "Wind Speed (m/s)", "Wind Arrow", "Air Temp (°C)",
+        "Wave Height (m)", "Wave Arrow", "Wave Period (s)",
+        "Wave Power Index", "Wave Energy (kJ/m²)"
+    ]]
 
-    html_table = styled.to_html()
+    html_table = table_df.to_html(index=False, border=0)
 
     outpath = os.path.join(docs_dir, page_file)
     with open(outpath, "w", encoding="utf-8") as f:
