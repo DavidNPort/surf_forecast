@@ -5,46 +5,44 @@ on:
     - cron: '0 */6 * * *'    # every 6 hours
   workflow_dispatch:
 
-# Top-level permissions to allow the deploy-pages action to mint an OIDC token
 permissions:
-  contents: read     # for checkout
-  pages: write       # to publish to GitHub Pages
-  id-token: write    # required by configure-pages & deploy-pages
+  contents: write     # give the GITHUB_TOKEN push rights
+  id-token: write     # not strictly needed here but ok
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Check out your code
-      - name: Checkout repository
+      # 1. Checkout using the built-in GITHUB_TOKEN with write access
+      - name: Checkout repo
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2) Set up Python
-      - name: Set up Python 3.10
+      # 2. Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3) Install dependencies
-      - name: Install Python dependencies
+      # 3. Install deps & run script
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      # 4) Run your forecast script (writes into docs/)
-      - name: Generate Surf Forecast pages
+      - name: Generate forecast pages
         run: |
           python surf_forecast.py
 
-      # 5) Configure Pages
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v3
-
-      # 6) Upload everything in docs/ as the Pages artifact
-      - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: docs
+      # 4. Commit & push the updated HTML
+      - name: Commit and push changes
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add docs/*.html
+          git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
+          git push
 
       # 7) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
