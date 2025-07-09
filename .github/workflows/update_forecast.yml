@@ -32,6 +32,14 @@ jobs:
           git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
           git push
 
-      # 7) Deploy to GitHub Pages
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
+
