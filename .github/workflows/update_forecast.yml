@@ -5,39 +5,47 @@ on:
     - cron: '0 */6 * * *'    # every 6 hours
   workflow_dispatch:
 
+# Top-level permissions to allow the deploy-pages action to mint an OIDC token
+permissions:
+  contents: read     # for checkout
+  pages: write       # to publish to GitHub Pages
+  id-token: write    # required by configure-pages & deploy-pages
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # 1) Check out your code
+      - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
+      # 2) Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      # 3) Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: Run forecast script
+      # 4) Run your forecast script (writes into docs/)
+      - name: Generate Surf Forecast pages
         run: |
           python surf_forecast.py
 
-      - name: Commit and push changes
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add docs/*.html
-          git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
-          # here we inject the GITHUB_TOKEN into the origin URL so git push is authenticated
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git push
+      # 5) Configure Pages
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v3
 
+      # 6) Upload everything in docs/ as the Pages artifact
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: docs
 
+      # 7) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v1
