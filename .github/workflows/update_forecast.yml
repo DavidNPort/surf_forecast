@@ -2,47 +2,43 @@ name: Update Surf Forecast
 
 on:
   schedule:
-    - cron: '0 */6 * * *'    # every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write     # give the GITHUB_TOKEN push rights
-  id-token: write     # not strictly needed here but ok
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout using the built-in GITHUB_TOKEN with write access
       - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. Install deps & run script
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Generate forecast pages
-        run: |
-          python surf_forecast.py
+      - name: Run forecast script
+        run: python surf_forecast.py
 
-      # 4. Commit & push the updated HTML
-      - name: Commit and push changes
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add docs/*.html
-          git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
-          git push
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
 
       # 7) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
