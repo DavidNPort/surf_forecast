@@ -2,7 +2,7 @@ name: Update Surf Forecast
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *'    # every 6 hours
   workflow_dispatch:
 
 permissions:
@@ -26,14 +26,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run forecast script
+      - name: Generate forecast pages
         run: python surf_forecast.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v3
 
       - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: docs
 
