@@ -2,7 +2,7 @@ name: Update Surf Forecast
 
 on:
   schedule:
-    - cron: '0 */6 * * *'    # every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,10 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,16 +25,4 @@ jobs:
         run: |
           python surf_forecast.py
 
-      - name: Commit and push changes
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add docs/*.html
-          git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
-          # here we inject the GITHUB_TOKEN into the origin URL so git push is authenticated
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git push
-
-          git commit -m "Auto update surf forecast data" || echo "Nothing to commit"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git push
+      # ← remove the entire “Commit and push changes” step
